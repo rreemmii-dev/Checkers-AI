@@ -1,7 +1,7 @@
 # Checkers-AI
 
 
-A checkers game with an AI algorithm (for more information, see [#AI Algorithm](#ai-algorithm)).
+A checkers (or draughts) game with an AI algorithm (for more information, see [#AI Algorithm](#ai-algorithm)), written in Rust.
 
 Rules: [English draughts](https://en.wikipedia.org/wiki/English_draughts)
 
@@ -47,9 +47,9 @@ The idea is to run several [negamax](https://en.wikipedia.org/wiki/Negamax) sear
 
 Thus, the AI runs in two parts:
 
-1) A first part, which is a shallow multithreaded [depth-first search (DFS)](https://en.wikipedia.org/wiki/Depth-first_search), in which the AI goes 2 moves deep.
+1) A shallow multithreaded [depth-first search (DFS)](https://en.wikipedia.org/wiki/Depth-first_search), in which the AI goes 2 moves deep.
 
-2) Then, a [negamax](https://en.wikipedia.org/wiki/Negamax) search is run at the end of each branch of the initial DFS.
+2) A [negamax](https://en.wikipedia.org/wiki/Negamax) search at the end of each branch of the initial DFS.
 
 ### Compute a board score
 
