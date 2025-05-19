@@ -1,0 +1,13 @@
+bin = [
+    { name = "Checkers", path = "src/main.rs" }
+]
+
+[package]
+name = "Checkers"
+edition = "2024"
+
+[dependencies]
+rand = "0.9.1"
+
+[profile.release]
+debug = true
