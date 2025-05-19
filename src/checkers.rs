@@ -92,7 +92,7 @@ impl Board {
     pub fn get_board_count(&self) -> i8 {
         match self.board_count.get(&(self.get_player(), self.board)) {
             Some(&n) => n,
-            None => 0
+            None => 0,
         }
     }
 
@@ -121,7 +121,7 @@ impl Board {
             board: [[None; BOARD_SIZE as usize]; BOARD_SIZE as usize],
             current_player: Player::White,
             board_count: HashMap::new(),
-            moves_without_capture: 0
+            moves_without_capture: 0,
         };
         for y in 0..NB_PLAYERS_LINES {
             for x in 0..BOARD_SIZE {
@@ -188,7 +188,13 @@ impl Board {
             for x in 0..BOARD_SIZE {
                 match self.get(x, y) {
                     Some(piece) => print!(" {} ", piece.emoji()),
-                    None => { if is_playable(x, y) { print!(" • ") } else { print!("   ") } },
+                    None => {
+                        if is_playable(x, y) {
+                            print!(" • ")
+                        } else {
+                            print!("   ")
+                        }
+                    }
                 }
             }
             print!(" {} ", char_of_y(y));
@@ -289,11 +295,11 @@ impl Board {
             }
             exit(0);
         }
-        assert!(possible_moves.contains(moves), "Unauthorized move ({:?}). List: {:?}", moves, possible_moves);
+        assert!(possible_moves.contains(moves), "Unauthorized move ({moves:?}). List: {possible_moves:?}");
         let rev_moves = moves.iter().rev().copied().collect::<Vec<_>>();
         let (mut x, mut y) = rev_moves[0];
         let (x2, y2) = rev_moves[1];
-        if i8::abs(y2 - y) == 1 {  // No jump
+        if i8::abs(y2 - y) == 1 { // No jump
             self.set(x2, y2, self.get(x, y));
             self.set(x, y, None);
             (x, y) = (x2, y2);

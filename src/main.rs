@@ -2,9 +2,10 @@ mod checkers;
 
 use crate::checkers::{char_of_x, char_of_y, Board, Piece, BOARD_SIZE, NB_PLAYERS_LINES, MAX_BOARD_COUNT, MAX_MOVES_WITHOUT_CAPTURE};
 
-use std::time::Instant;
-use std::thread;
+use std::fmt::Write;
 use std::sync::Arc;
+use std::thread;
+use std::time::Instant;
 
 const MAN_SCORE: i64 = 1;
 const KING_SCORE: i64 = 2;
@@ -19,8 +20,8 @@ const NEG_INFINITY: i64 = -POS_INFINITY;
 const WHITE_WIN: i64 = WHITE_SIGN * (POS_INFINITY - 1);
 const BLACK_WIN: i64 = BLACK_SIGN * (POS_INFINITY - 1);
 const DRAW: i64 = 0;
-const MAX_DEPTH: i8 = 2 * 4;  // recommended: 2 * 4 in dev, 2 * 6 in release, 2 * 7 if highly multithreaded
-const MAX_THREADS_DEPTH: i8 = 2;  // recommended: 2 (branch-size between 5 and 10, so creates between 25 and 100 threads)
+const MAX_DEPTH: i8 = 2 * 4; // recommended: 2 * 4 in dev, 2 * 6 in release, 2 * 7 if highly multithreaded
+const MAX_THREADS_DEPTH: i8 = 2; // recommended: 2 (branch-size between 5 and 10, so creates between 25 and 100 threads)
 const PLAY_AS_WHITE: bool = true;
 
 fn piece_score(piece: &Piece) -> i64 {
@@ -91,7 +92,7 @@ fn alpha_beta_score(board: &Board, alpha: i64, beta: i64, depth: i8) -> i64 {
         } else if res > alpha {
             alpha = res;
         }
-    };
+    }
     alpha
 }
 
@@ -112,7 +113,7 @@ fn alpha_beta_list(board: &Board, depth: i8) -> (i64, Vec<Vec<(i8, i8)>>) {
         } else if res == best_score {
             best_moves.push(m.clone());
         }
-    };
+    }
     (best_score, best_moves)
 }
 
@@ -132,7 +133,7 @@ fn threaded_score(board: Board, depth: i8, threads_depth: i8) -> i64 {
             let mut cloned_board = (*board).clone();
             cloned_board.play(&m);
             -threaded_score(cloned_board, depth - 1, threads_depth - 1)
-        }))
+        }));
     }
     let mut best_score = NEG_INFINITY;
     for h in handle {
@@ -161,8 +162,8 @@ fn threaded_moves_list(board: Board, depth: i8, threads_depth: i8) -> (i64, Vec<
             cloned_board.play(&m);
             let res = -threaded_score(cloned_board, depth - 1, threads_depth - 1);
             (res, m)
-        }))
-    };
+        }));
+    }
     let mut best_score = NEG_INFINITY;
     let mut best_moves = Vec::new();
     for h in handle {
@@ -180,7 +181,7 @@ fn threaded_moves_list(board: Board, depth: i8, threads_depth: i8) -> (i64, Vec<
 fn string_of_move(m: &Vec<(i8, i8)>) -> String {
     let mut str = String::new();
     for &(x, y) in m.iter().rev() {
-        str.push_str(&format!("{}{} -> ", char_of_x(x), char_of_y(y)));
+        write!(str, "{}{} -> ", char_of_x(x), char_of_y(y)).unwrap();
     }
     for _ in 0.." -> ".len() {
         str.pop();
@@ -212,10 +213,8 @@ fn get_human_move(board: &Board) -> Vec<(i8, i8)> {
             } else {
                 get_human_move(board)
             }
-        },
-        Err(_) => {
-            get_human_move(board)
         }
+        Err(_) => get_human_move(board),
     }
 }
 
@@ -227,7 +226,7 @@ fn get_ai_move(board: &Board) -> Vec<(i8, i8)> {
     let time = Instant::now();
     let (_score, best_moves) = threaded_moves_list(board.clone(), MAX_DEPTH, MAX_THREADS_DEPTH);
     let dt = time.elapsed();
-    println!("AI computation time: {:?}", dt);
+    println!("AI computation time: {dt:?}");
     let x = rand::random_range(0..best_moves.len());
     println!("Play {}", string_of_move(&best_moves[x]));
     best_moves[x].clone()

@@ -9,5 +9,9 @@ edition = "2024"
 [dependencies]
 rand = "0.9.1"
 
+[lints.clippy]
+pedantic = "warn"
+
+# For profiling
 [profile.release]
 debug = true
