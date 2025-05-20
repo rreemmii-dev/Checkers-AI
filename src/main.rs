@@ -20,11 +20,11 @@ const NEG_INFINITY: i64 = -POS_INFINITY;
 const WHITE_WIN: i64 = WHITE_SIGN * (POS_INFINITY - 1);
 const BLACK_WIN: i64 = BLACK_SIGN * (POS_INFINITY - 1);
 const DRAW: i64 = 0;
-const MAX_DEPTH: i8 = 2 * 4; // recommended: 2 * 4 in dev, 2 * 6 in release, 2 * 7 if highly multithreaded
+const MAX_DEPTH: i8 = 2 * 6; // recommended: 2 * 5 in dev, 2 * 6 in release
 const MAX_THREADS_DEPTH: i8 = 2; // recommended: 2 (branch-size between 5 and 10, so creates between 25 and 100 threads)
 const PLAY_AS_WHITE: bool = true;
 
-fn piece_score(piece: &Piece) -> i64 {
+fn piece_score(piece: Piece) -> i64 {
     let sign = if piece.is_white() { WHITE_SIGN } else { BLACK_SIGN };
     let value = if piece.is_king() { KING_SCORE } else { MAN_SCORE };
     sign * value
@@ -70,8 +70,8 @@ fn naive_score(board: &Board) -> i64 {
     }
 
     let mut score = 0;
-    for (piece, count) in board.get_pieces_counter() {
-        score += count * piece_score(&piece);
+    for (piece_hash, count) in board.get_pieces_counter().into_iter().enumerate() {
+        score += count * piece_score(Piece::unhash(piece_hash));
     }
     score *= coef_board_count(board.get_board_count());
     score *= coef_moves_without_capture(board.get_moves_without_capture());

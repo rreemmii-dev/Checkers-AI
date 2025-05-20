@@ -9,6 +9,10 @@ pub const NB_PLAYERS_LINES: i8 = 3;
 pub const MAX_BOARD_COUNT: i8 = 3;
 pub const MAX_MOVES_WITHOUT_CAPTURE: i8 = 2 * 40;
 
+const MAX_PIECE_HASH_VALUE: usize = 3;
+const NONE_PIECE_HASH_VALUE: usize = MAX_PIECE_HASH_VALUE + 1;
+const MAX_OPT_PIECE_HASH_VALUE: usize = NONE_PIECE_HASH_VALUE;
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum Player {
     White,
@@ -28,6 +32,27 @@ pub struct Piece {
 }
 
 impl Piece {
+    pub fn hash(&self) -> usize {
+        assert_eq!(MAX_PIECE_HASH_VALUE, 3);
+        match self {
+            Piece { player: Player::White, piece_type: PieceType::Man } => 0,
+            Piece { player: Player::White, piece_type: PieceType::King } => 1,
+            Piece { player: Player::Black, piece_type: PieceType::Man } => 2,
+            Piece { player: Player::Black, piece_type: PieceType::King } => 3,
+        }
+    }
+
+    pub fn unhash(hash: usize) -> Piece {
+        assert!((0..=MAX_PIECE_HASH_VALUE).contains(&hash));
+        match hash {
+            0 => Piece { player: Player::White, piece_type: PieceType::Man },
+            1 => Piece { player: Player::White, piece_type: PieceType::King },
+            2 => Piece { player: Player::Black, piece_type: PieceType::Man },
+            3 => Piece { player: Player::Black, piece_type: PieceType::King },
+            _ => panic!(),
+        }
+    }
+
     pub fn is_white(&self) -> bool {
         self.player == Player::White
     }
@@ -55,67 +80,25 @@ impl Piece {
     }
 }
 
+fn piece_opt_hash(piece: Option<Piece>) -> u64 {
+    (if let Some(p) = piece {
+        p.hash()
+    } else {
+        NONE_PIECE_HASH_VALUE
+    }) as u64
+}
+
+type BoardHashType = (bool, u64, u64, u64);
+
 #[derive(Clone)]
 pub struct Board {
     board: [[Option<Piece>; BOARD_SIZE as usize]; BOARD_SIZE as usize],
     current_player: Player,
-    board_count: HashMap<(Player, [[Option<Piece>; BOARD_SIZE as usize]; BOARD_SIZE as usize]), i8>,
+    board_count: HashMap<BoardHashType, i8>,
     moves_without_capture: i8,
 }
 
 impl Board {
-    pub fn get(&self, x: i8, y: i8) -> Option<Piece> {
-        self.board[y as usize][x as usize]
-    }
-
-    fn set(&mut self, x: i8, y: i8, piece_opt: Option<Piece>) {
-        assert!(is_playable(x, y));
-        self.board[y as usize][x as usize] = piece_opt;
-    }
-
-    fn get_player(&self) -> Player {
-        self.current_player
-    }
-
-    pub fn get_player_is_white(&self) -> bool {
-        self.get_player() == Player::White
-    }
-
-    fn switch_player(&mut self) {
-        if self.get_player() == Player::White {
-            self.current_player = Player::Black;
-        } else {
-            self.current_player = Player::White;
-        }
-    }
-
-    pub fn get_board_count(&self) -> i8 {
-        match self.board_count.get(&(self.get_player(), self.board)) {
-            Some(&n) => n,
-            None => 0,
-        }
-    }
-
-    fn incr_board_count(&mut self) {
-        self.board_count.insert((self.get_player(), self.board), self.get_board_count() + 1);
-    }
-
-    pub fn get_moves_without_capture(&self) -> i8 {
-        self.moves_without_capture
-    }
-
-    fn incr_moves_without_capture(&mut self) {
-        self.moves_without_capture += 1;
-    }
-
-    fn reset_moves_without_capture(&mut self) {
-        self.moves_without_capture = 0;
-    }
-
-    pub fn is_draw(&self) -> bool {
-        self.get_board_count() == MAX_BOARD_COUNT || self.get_moves_without_capture() == MAX_MOVES_WITHOUT_CAPTURE
-    }
-
     pub fn new() -> Board {
         let mut b = Board {
             board: [[None; BOARD_SIZE as usize]; BOARD_SIZE as usize],
@@ -147,64 +130,93 @@ impl Board {
         b
     }
 
-    pub fn get_pieces_counter(&self) -> HashMap<Piece, i64> {
-        let mut counter = HashMap::new();
-        for player in [Player::White, Player::Black] {
-            for piece_type in [PieceType::Man, PieceType::King] {
-                counter.insert(Piece { player, piece_type }, 0);
+    fn hash(&self) -> BoardHashType {
+        fn hash_lines(board: &Board, start: i8, stop: i8) -> u64 {
+            let mut res = 0;
+            for y in start..stop {
+                for x in 0..BOARD_SIZE {
+                    if is_playable(x, y) {
+                        res *= (MAX_OPT_PIECE_HASH_VALUE + 1) as u64;
+                        res += piece_opt_hash(board.get(x, y));
+                    }
+                }
             }
+            res
+        }
+
+        (
+            self.get_player_is_white(),
+            hash_lines(self, 0, NB_PLAYERS_LINES),
+            hash_lines(self, NB_PLAYERS_LINES, BOARD_SIZE - NB_PLAYERS_LINES),
+            hash_lines(self, BOARD_SIZE - NB_PLAYERS_LINES, BOARD_SIZE),
+        )
+    }
+
+    pub fn get(&self, x: i8, y: i8) -> Option<Piece> {
+        self.board[y as usize][x as usize]
+    }
+
+    fn set(&mut self, x: i8, y: i8, piece_opt: Option<Piece>) {
+        assert!(is_playable(x, y));
+        self.board[y as usize][x as usize] = piece_opt;
+    }
+
+    fn get_player(&self) -> Player {
+        self.current_player
+    }
+
+    pub fn get_player_is_white(&self) -> bool {
+        self.get_player() == Player::White
+    }
+
+    fn switch_player(&mut self) {
+        if self.get_player() == Player::White {
+            self.current_player = Player::Black;
+        } else {
+            self.current_player = Player::White;
+        }
+    }
+
+    pub fn get_board_count(&self) -> i8 {
+        match self.board_count.get(&self.hash()) {
+            Some(&n) => n,
+            None => 0,
+        }
+    }
+
+    fn incr_board_count(&mut self) {
+        self.board_count.insert(self.hash(), self.get_board_count() + 1);
+    }
+
+    pub fn get_moves_without_capture(&self) -> i8 {
+        self.moves_without_capture
+    }
+
+    fn incr_moves_without_capture(&mut self) {
+        self.moves_without_capture += 1;
+    }
+
+    fn reset_moves_without_capture(&mut self) {
+        self.moves_without_capture = 0;
+    }
+
+    pub fn is_draw(&self) -> bool {
+        self.get_board_count() == MAX_BOARD_COUNT || self.get_moves_without_capture() == MAX_MOVES_WITHOUT_CAPTURE
+    }
+
+    pub fn get_pieces_counter(&self) -> Vec<i64> {
+        let mut counter = Vec::new();
+        for _ in 0..4 {
+            counter.push(0);
         }
         for x in 0..BOARD_SIZE {
             for y in 0..BOARD_SIZE {
                 if let Some(piece) = self.get(x, y) {
-                    counter.insert(piece, counter[&piece] + 1);
+                    counter[piece.hash()] += 1;
                 }
             }
         }
         counter
-    }
-
-    pub fn display(&self) {
-        println!("\n{:?} is playing", self.get_player());
-        println!("Moves without capture nor promotion: {}/{}", self.get_moves_without_capture(), MAX_MOVES_WITHOUT_CAPTURE);
-        println!("Board count: {}/{}", self.get_board_count(), MAX_BOARD_COUNT);
-        let pieces_counter = self.get_pieces_counter();
-        println!("White: {} men, {} kings",
-            pieces_counter[&Piece { player: Player::White, piece_type: PieceType::Man }],
-            pieces_counter[&Piece { player: Player::White, piece_type: PieceType::King }]
-        );
-        println!("Black: {} men, {} kings",
-            pieces_counter[&Piece { player: Player::Black, piece_type: PieceType::Man }],
-            pieces_counter[&Piece { player: Player::Black, piece_type: PieceType::King }]
-        );
-        println!();
-        print!("   ");
-        for x in 0..BOARD_SIZE {
-            print!(" {} ", char_of_x(x));
-        }
-        println!();
-        for y in (0..BOARD_SIZE).rev() {
-            print!(" {} ", char_of_y(y));
-            for x in 0..BOARD_SIZE {
-                match self.get(x, y) {
-                    Some(piece) => print!(" {} ", piece.emoji()),
-                    None => {
-                        if is_playable(x, y) {
-                            print!(" • ")
-                        } else {
-                            print!("   ")
-                        }
-                    }
-                }
-            }
-            print!(" {} ", char_of_y(y));
-            println!();
-        }
-        print!("   ");
-        for x in 0..BOARD_SIZE {
-            print!(" {} ", char_of_x(x));
-        }
-        println!("\n");
     }
 
     pub fn possible_moves(&self) -> Vec<Vec<(i8, i8)>> {
@@ -325,6 +337,49 @@ impl Board {
         self.switch_player();
 
         self.incr_board_count();
+    }
+
+    pub fn display(&self) {
+        println!("\n{:?} is playing", self.get_player());
+        println!("Moves without capture nor promotion: {}/{}", self.get_moves_without_capture(), MAX_MOVES_WITHOUT_CAPTURE);
+        println!("Board count: {}/{}", self.get_board_count(), MAX_BOARD_COUNT);
+        let pieces_counter = self.get_pieces_counter();
+        println!("White: {} men, {} kings",
+            pieces_counter[Piece { player: Player::White, piece_type: PieceType::Man }.hash()],
+            pieces_counter[Piece { player: Player::White, piece_type: PieceType::King }.hash()]
+        );
+        println!("Black: {} men, {} kings",
+            pieces_counter[Piece { player: Player::Black, piece_type: PieceType::Man }.hash()],
+            pieces_counter[Piece { player: Player::Black, piece_type: PieceType::King }.hash()]
+        );
+        println!();
+        print!("   ");
+        for x in 0..BOARD_SIZE {
+            print!(" {} ", char_of_x(x));
+        }
+        println!();
+        for y in (0..BOARD_SIZE).rev() {
+            print!(" {} ", char_of_y(y));
+            for x in 0..BOARD_SIZE {
+                match self.get(x, y) {
+                    Some(piece) => print!(" {} ", piece.emoji()),
+                    None => {
+                        if is_playable(x, y) {
+                            print!(" • ")
+                        } else {
+                            print!("   ")
+                        }
+                    }
+                }
+            }
+            print!(" {} ", char_of_y(y));
+            println!();
+        }
+        print!("   ");
+        for x in 0..BOARD_SIZE {
+            print!(" {} ", char_of_x(x));
+        }
+        println!("\n");
     }
 }
 
