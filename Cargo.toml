@@ -7,7 +7,7 @@ name = "Checkers"
 edition = "2024"
 
 [dependencies]
-rand = "0.9.1"
+rand = "0.9.2"
 
 [lints.clippy]
 pedantic = "warn"
