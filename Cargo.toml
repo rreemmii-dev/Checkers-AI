@@ -8,10 +8,21 @@ edition = "2024"
 
 [dependencies]
 rand = "0.9.2"
+ndarray = { version = "0.17.1", optional = true }
+blas-src = { version = "0.14.0", features = ["openblas"], optional = true }
+openblas-src = { version = "0.10.13", features = ["cblas", "system"], optional = true }
+
+[build-dependencies]
+cc = "1.2.51"
+
+[features]
+base = ["ndarray"]
+openblas = ["base", "ndarray/blas", "blas-src/openblas", "openblas-src/cblas", "openblas-src/system"]
+cublas = []
 
 [lints.clippy]
 pedantic = "warn"
 
 # For profiling
 [profile.release]
-debug = true
+debug = "full"

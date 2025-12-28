@@ -351,7 +351,7 @@ impl Board {
                     continue;
                 }
                 let piece_opt = self.get(x, y);
-                let directions = allowed_directions(piece_opt.unwrap());
+                let directions = get_directions(piece_opt.unwrap());
                 if can_jump {
                     add_jumping(&mut board, &mut moves, directions, x, y);
                 } else {
@@ -477,13 +477,19 @@ pub fn is_playable(x: i8, y: i8) -> bool {
     (0..BOARD_SIZE).contains(&x) && (0..BOARD_SIZE).contains(&y) && (x + y) % 2 == 0
 }
 
-fn allowed_directions(piece: Piece) -> &'static [(i8, i8)] {
-    if piece.is_king() {
-        DIRECTION_KING
-    } else if piece.is_white() {
+fn get_man_direction(player: Player) -> &'static [(i8, i8)] {
+    if player.is_white() {
         DIRECTION_MAN_WHITE
     } else {
         DIRECTION_MAN_BLACK
+    }
+}
+
+fn get_directions(piece: Piece) -> &'static [(i8, i8)] {
+    if piece.is_king() {
+        DIRECTION_KING
+    } else {
+        get_man_direction(piece.get_player())
     }
 }
 

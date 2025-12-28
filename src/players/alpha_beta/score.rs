@@ -57,39 +57,39 @@ fn piece_score(piece: Piece, x: i8, y: i8) -> i64 {
     sign * value
 }
 
+fn coef_board_count(n: i8) -> i64 {
+    assert_eq!(MAX_BOARD_COUNT, 3);
+    if n == 0 || n == 1 {
+        MAX_BOARD_COUNT_SCORE_COEF * 1
+    } else if n == 2 {
+        MAX_BOARD_COUNT_SCORE_COEF * 3 / 4
+    } else if n == 3 {
+        MAX_BOARD_COUNT_SCORE_COEF * 0
+    } else {
+        panic!()
+    }
+}
+
+fn coef_moves_without_capture(n: i8) -> i64 {
+    assert_eq!(MAX_MOVES_WITHOUT_CAPTURE, 80);
+    let n = i64::from(n);
+    if n <= 40 {
+        MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * 1
+    } else if n <= 60 {
+        MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * (100 - (n - 40) * 1) / 100
+    } else if n <= 80 {
+        MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * (100 - 20 - (n - 60) * 4) / 100
+    } else {
+        panic!()
+    }
+}
+
 pub fn naive_score(board: &Board) -> i64 {
     match board.get_win_status() {
         Draw => return DRAW,
         Win(Player::White) => return WHITE_WIN,
         Win(Player::Black) => return BLACK_WIN,
         _ => (),
-    }
-
-    fn coef_board_count(n: i8) -> i64 {
-        assert_eq!(MAX_BOARD_COUNT, 3);
-        if n == 0 || n == 1 {
-            MAX_BOARD_COUNT_SCORE_COEF * 1
-        } else if n == 2 {
-            MAX_BOARD_COUNT_SCORE_COEF * 3 / 4
-        } else if n == 3 {
-            MAX_BOARD_COUNT_SCORE_COEF * 0
-        } else {
-            panic!()
-        }
-    }
-
-    fn coef_moves_without_capture(n: i8) -> i64 {
-        assert_eq!(MAX_MOVES_WITHOUT_CAPTURE, 80);
-        let n = i64::from(n);
-        if n <= 40 {
-            MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * 1
-        } else if n <= 60 {
-            MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * (100 - (n - 40) * 1) / 100
-        } else if n <= 80 {
-            MAX_MOVES_WITHOUT_CAPTURE_SCORE_COEF * (100 - 20 - (n - 60) * 4) / 100
-        } else {
-            panic!()
-        }
     }
 
     let mut score = 0;

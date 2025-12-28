@@ -1,5 +1,5 @@
 use crate::checkers::board::{Board, BoardHash, Move};
-use crate::score::{NEG_INFINITY, POS_INFINITY};
+use crate::players::alpha_beta::score::{NEG_INFINITY, POS_INFINITY};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -9,7 +9,7 @@ use std::thread;
 
 /// heuristic_score: Current player point of view
 
-pub fn alpha_beta_score(
+fn alpha_beta_score(
     board: &Board,
     alpha: i64,
     beta: i64,
@@ -142,7 +142,7 @@ pub fn alpha_beta_list(
     best_move_first_skip_size: i8,
     depth: i8,
     cancel_search: &AtomicBool,
-) -> Option<(i64, Vec<Move>)> {
+) -> Option<Vec<Move>> {
     if cancel_search.load(Ordering::Acquire) {
         return None;
     }
@@ -150,10 +150,14 @@ pub fn alpha_beta_list(
     let mut cache = HashMap::new();
 
     if depth == 0 || board.is_end_game() {
-        return Some((heuristic_score(board), Vec::new()));
+        return Some(Vec::new());
     }
 
-    // ********** Choose best move first **********
+    let possible_moves = board.possible_moves();
+    if possible_moves.len() == 1 {
+        return Some(vec![possible_moves[0].clone()]);
+    }
+
     let moves = if depth >= best_move_first_min_depth {
         let mut moves = board
             .possible_moves()
@@ -215,7 +219,7 @@ pub fn alpha_beta_list(
         return None;
     }
 
-    Some((best_score, best_moves))
+    Some(best_moves)
 }
 
 fn threaded_score(
@@ -290,14 +294,20 @@ pub fn threaded_moves_list(
     depth: i8,
     threads_depth: i8,
     cancel_search: Arc<AtomicBool>,
-) -> Option<(i64, Vec<Move>)> {
+) -> Option<Vec<Move>> {
     if cancel_search.load(Ordering::Acquire) {
         return None;
     }
 
     if depth == 0 || board.is_end_game() {
-        return Some((heuristic_score(&board), Vec::new()));
+        return Some(Vec::new());
     }
+
+    let possible_moves = board.possible_moves();
+    if possible_moves.len() == 1 {
+        return Some(vec![possible_moves[0].clone()]);
+    }
+
     let mut handle = Vec::new();
     let board = Arc::new(board);
     for m in board.possible_moves() {
@@ -335,5 +345,5 @@ pub fn threaded_moves_list(
         return None;
     }
 
-    Some((best_score, best_moves))
+    Some(best_moves)
 }
