@@ -8,6 +8,7 @@ use crate::checkers::player::Player::{Black, White};
 use crate::checkers::win_status::WinStatus;
 use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::process::exit;
 use std::vec;
 
@@ -29,13 +30,13 @@ pub const NB_PLAYERS_LINES: i8 = 3;
 pub const MAX_BOARD_COUNT: i8 = 3;
 pub const MAX_MOVES_WITHOUT_CAPTURE: i8 = 2 * 40;
 
-const DIRECTION_KING: &[(i8, i8)] = &[(1, 1), (-1, 1), (1, -1), (-1, -1)];
-const DIRECTION_MAN_WHITE: &[(i8, i8)] = &[(1, 1), (-1, 1)];
-const DIRECTION_MAN_BLACK: &[(i8, i8)] = &[(1, -1), (-1, -1)];
+const DIRECTIONS_KING: &[(i8, i8)] = &[(1, 1), (-1, 1), (1, -1), (-1, -1)];
+const DIRECTIONS_MAN_WHITE: &[(i8, i8)] = &[(1, 1), (-1, 1)];
+const DIRECTIONS_MAN_BLACK: &[(i8, i8)] = &[(1, -1), (-1, -1)];
 
 impl Board {
     pub fn new() -> Board {
-        let mut b = Board {
+        let mut board = Board {
             white_bitboard: 0,
             black_bitboard: 0,
             king_bitboard: 0,
@@ -43,79 +44,9 @@ impl Board {
             board_count: HashMap::new(),
             moves_without_capture: 0,
         };
-        for y in 0..NB_PLAYERS_LINES {
-            for x in 0..BOARD_SIZE {
-                if is_playable(x, y) {
-                    b.set(x, y, Some(Piece::from(White, Man)));
-                }
-            }
-        }
-        for y in (BOARD_SIZE - NB_PLAYERS_LINES)..BOARD_SIZE {
-            for x in 0..BOARD_SIZE {
-                if is_playable(x, y) {
-                    b.set(x, y, Some(Piece::from(Black, Man)));
-                }
-            }
-        }
-        b.incr_board_count();
-        b
-    }
-
-    pub fn get_white_bitboard(&self) -> u32 {
-        self.white_bitboard
-    }
-
-    pub fn get_black_bitboard(&self) -> u32 {
-        self.black_bitboard
-    }
-
-    pub fn get_king_bitboard(&self) -> u32 {
-        self.king_bitboard
-    }
-
-    fn get_mut_white_bitboard(&mut self) -> &mut u32 {
-        &mut self.white_bitboard
-    }
-
-    fn get_mut_black_bitboard(&mut self) -> &mut u32 {
-        &mut self.black_bitboard
-    }
-
-    fn get_mut_king_bitboard(&mut self) -> &mut u32 {
-        &mut self.king_bitboard
-    }
-
-    pub fn get_player_bitboard(&self, player: Player) -> u32 {
-        if player.is_white() {
-            self.get_white_bitboard()
-        } else {
-            self.get_black_bitboard()
-        }
-    }
-
-    pub fn get_any_bitboard(&self) -> u32 {
-        self.get_white_bitboard() | self.get_black_bitboard()
-    }
-
-    pub fn get_bitboard(&self, piece: Piece) -> u32 {
-        let player = piece.get_player();
-        let piece_type = piece.get_piece_type();
-        let player_bitboard = self.get_player_bitboard(player);
-        let piece_type_bitboard = if piece_type.is_king() {
-            self.get_king_bitboard()
-        } else {
-            !self.get_king_bitboard()
-        };
-        player_bitboard & piece_type_bitboard
-    }
-
-    pub fn hash(&self) -> BoardHash {
-        (
-            self.get_player_is_white(),
-            self.get_white_bitboard(),
-            self.get_black_bitboard(),
-            self.get_king_bitboard(),
-        )
+        board.add_default_pieces_configuration();
+        board.incr_board_count();
+        board
     }
 
     pub fn get(&self, x: i8, y: i8) -> Option<Piece> {
@@ -123,9 +54,10 @@ impl Board {
         let is_black = self.get_black_bitboard().is_some(x, y);
         let is_king = self.get_king_bitboard().is_some(x, y);
         let is_any = is_white | is_black;
+        let is_empty = !is_any;
 
         assert!(!(is_white && is_black));
-        assert!(!(is_king && !is_any));
+        assert!(!(is_king && is_empty));
 
         if is_any {
             Some(Piece::from(
@@ -137,37 +69,8 @@ impl Board {
         }
     }
 
-    fn set(&mut self, x: i8, y: i8, piece_opt: Option<Piece>) {
-        let is_white = if let Some(piece) = piece_opt {
-            piece.is_white()
-        } else {
-            false
-        };
-        let is_black = if let Some(piece) = piece_opt {
-            piece.is_black()
-        } else {
-            false
-        };
-        let is_king = if let Some(piece) = piece_opt {
-            piece.is_king()
-        } else {
-            false
-        };
-        self.get_mut_white_bitboard().set(x, y, is_white);
-        self.get_mut_black_bitboard().set(x, y, is_black);
-        self.get_mut_king_bitboard().set(x, y, is_king);
-    }
-
-    pub fn get_player(&self) -> Player {
-        self.current_player
-    }
-
     pub fn get_player_is_white(&self) -> bool {
         self.get_player().is_white()
-    }
-
-    fn switch_player(&mut self) {
-        self.current_player = self.get_player().other();
     }
 
     pub fn get_board_count(&self) -> i8 {
@@ -177,32 +80,8 @@ impl Board {
         }
     }
 
-    fn incr_board_count(&mut self) {
-        self.board_count
-            .entry(self.hash())
-            .and_modify(|e| *e += 1)
-            .or_insert(1);
-    }
-
-    fn reset_board_count(&mut self) {
-        self.board_count.clear();
-    }
-
     pub fn get_moves_without_capture(&self) -> i8 {
         self.moves_without_capture
-    }
-
-    fn incr_moves_without_capture(&mut self) {
-        self.moves_without_capture += 1;
-    }
-
-    fn reset_moves_without_capture(&mut self) {
-        self.moves_without_capture = 0;
-    }
-
-    fn is_draw(&self) -> bool {
-        self.get_board_count() == MAX_BOARD_COUNT
-            || self.get_moves_without_capture() == MAX_MOVES_WITHOUT_CAPTURE
     }
 
     pub fn get_win_status(&self) -> WinStatus {
@@ -219,143 +98,30 @@ impl Board {
         self.get_win_status().is_end_game()
     }
 
-    pub fn get_piece_counter(&self, piece: Piece) -> u32 {
-        let bitboard = self.get_bitboard(piece);
-        bitboard.count_ones()
-    }
-
-    fn can_move(&self) -> bool {
-        let man_directions = if self.get_player_is_white() {
-            DIRECTION_MAN_WHITE
-        } else {
-            DIRECTION_MAN_BLACK
-        };
-        let current_player = self.get_player();
-        let player_bitboard = self.get_player_bitboard(current_player);
-        let any_bitboard = self.get_any_bitboard();
-        for direction in man_directions {
-            if (player_bitboard.move_direction(direction) & !any_bitboard) != 0 {
-                return true;
-            }
-        }
-        let player_king_bitboard = player_bitboard & self.get_king_bitboard();
-        for direction in DIRECTION_KING {
-            if (player_king_bitboard.move_direction(direction) & !any_bitboard) != 0 {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn can_jump(&self) -> bool {
-        let man_directions = if self.get_player_is_white() {
-            DIRECTION_MAN_WHITE
-        } else {
-            DIRECTION_MAN_BLACK
-        };
-        let current_player = self.get_player();
-        let player_bitboard = self.get_player_bitboard(current_player);
-        let opponent_bitboard = self.get_player_bitboard(current_player.other());
-        let any_bitboard = self.get_any_bitboard();
-        for direction in man_directions {
-            if (player_bitboard
-                .move_direction(direction)
-                .move_direction(direction)
-                & opponent_bitboard.move_direction(direction)
-                & !any_bitboard)
-                != 0
-            {
-                return true;
-            }
-        }
-        let player_king_bitboard = player_bitboard & self.get_king_bitboard();
-        for direction in DIRECTION_KING {
-            if (player_king_bitboard
-                .move_direction(direction)
-                .move_direction(direction)
-                & opponent_bitboard.move_direction(direction)
-                & !any_bitboard)
-                != 0
-            {
-                return true;
-            }
-        }
-        false
-    }
-
     pub fn possible_moves(&self) -> Vec<Move> {
         if self.is_draw() {
             return Vec::new();
         }
 
-        fn add_moving(board: &Board, moves: &mut Vec<Move>, directions: &[(i8, i8)], x: i8, y: i8) {
-            for &(dx, dy) in directions {
-                let (x2, y2) = (x + dx, y + dy);
-                if is_playable(x2, y2) && board.get_any_bitboard().is_none(x2, y2) {
-                    moves.push(vec![(x, y), (x2, y2)]);
-                }
-            }
-        }
-
-        fn add_jumping(
-            board: &mut Board,
-            moves: &mut Vec<Move>,
-            directions: &[(i8, i8)],
-            x: i8,
-            y: i8,
-        ) -> Vec<usize> {
-            let mut moves_indexes = Vec::new();
-            for &(dx, dy) in directions {
-                let (x2, y2) = (x + dx, y + dy);
-                let (x3, y3) = (x2 + dx, y2 + dy);
-                if is_playable(x3, y3)
-                    && board.get_any_bitboard().is_none(x3, y3)
-                    && board
-                        .get_player_bitboard(board.get_player().other())
-                        .is_some(x2, y2)
-                {
-                    let jumping_piece = board.get(x, y);
-                    let taken_piece = board.get(x2, y2);
-                    board.set(x, y, None);
-                    board.set(x2, y2, None);
-                    board.set(x3, y3, jumping_piece);
-                    let mut further_moves_indexes = add_jumping(board, moves, directions, x3, y3);
-                    if further_moves_indexes.is_empty() {
-                        moves.push(vec![(x3, y3)]);
-                        further_moves_indexes.push(moves.len() - 1);
-                    }
-                    for &move_index in &further_moves_indexes {
-                        moves[move_index].insert(0, (x, y));
-                    }
-
-                    board.set(x, y, jumping_piece);
-                    board.set(x2, y2, taken_piece);
-                    board.set(x3, y3, None);
-
-                    moves_indexes.extend(further_moves_indexes);
-                }
-            }
-            moves_indexes
-        }
-
         let mut board = self.clone();
         let mut moves = Vec::new();
         let can_jump = board.can_jump();
+        let current_player_bitboard = board.get_player_bitboard(board.get_player());
 
         for x in 0..BOARD_SIZE {
             for y in 0..BOARD_SIZE {
                 if !is_playable(x, y) {
                     continue;
                 }
-                if board.get_player_bitboard(board.get_player()).is_none(x, y) {
+                if current_player_bitboard.is_none(x, y) {
                     continue;
                 }
-                let piece_opt = self.get(x, y);
-                let directions = get_directions(piece_opt.unwrap());
+                let piece = self.get(x, y).unwrap();
+                let directions = get_directions(piece);
                 if can_jump {
-                    add_jumping(&mut board, &mut moves, directions, x, y);
+                    add_moves_jumping(&mut board, &mut moves, directions, x, y);
                 } else {
-                    add_moving(&mut board, &mut moves, directions, x, y);
+                    add_moves_moving(&board, &mut moves, directions, x, y);
                 }
             }
         }
@@ -365,18 +131,7 @@ impl Board {
     }
 
     pub fn play(&mut self, moves: &Move) {
-        let win_status = self.get_win_status();
-        if win_status.is_end_game() {
-            println!("Game Over!");
-        }
-        if let Win(player) = win_status {
-            println!("> {player:?} won!");
-        } else if win_status == Draw {
-            println!("> Draw");
-        }
-        if win_status.is_end_game() {
-            exit(0);
-        }
+        self.output_game_status();
 
         let possible_moves = self.possible_moves();
         assert!(
@@ -408,68 +163,289 @@ impl Board {
             self.reset_board_count();
             self.reset_moves_without_capture();
         }
-        if y == BOARD_SIZE - 1 && self.get(x, y).unwrap() == (Piece::from(White, Man)) {
+        self.promote_if_necessary(x, y);
+        self.switch_player();
+        self.incr_board_count();
+    }
+
+    pub fn hash(&self) -> BoardHash {
+        (
+            self.get_player_is_white(),
+            self.get_white_bitboard(),
+            self.get_black_bitboard(),
+            self.get_king_bitboard(),
+        )
+    }
+
+    fn get_white_bitboard(&self) -> u32 {
+        self.white_bitboard
+    }
+
+    fn get_black_bitboard(&self) -> u32 {
+        self.black_bitboard
+    }
+
+    fn get_king_bitboard(&self) -> u32 {
+        self.king_bitboard
+    }
+
+    fn get_mut_white_bitboard(&mut self) -> &mut u32 {
+        &mut self.white_bitboard
+    }
+
+    fn get_mut_black_bitboard(&mut self) -> &mut u32 {
+        &mut self.black_bitboard
+    }
+
+    fn get_mut_king_bitboard(&mut self) -> &mut u32 {
+        &mut self.king_bitboard
+    }
+
+    fn get_player_bitboard(&self, player: Player) -> u32 {
+        if player.is_white() {
+            self.get_white_bitboard()
+        } else {
+            self.get_black_bitboard()
+        }
+    }
+
+    fn get_any_bitboard(&self) -> u32 {
+        self.get_white_bitboard() | self.get_black_bitboard()
+    }
+
+    fn get_empty_bitboard(&self) -> u32 {
+        !self.get_any_bitboard()
+    }
+
+    fn get_bitboard(&self, piece: Piece) -> u32 {
+        let player = piece.get_player();
+        let piece_type = piece.get_piece_type();
+        let player_bitboard = self.get_player_bitboard(player);
+        let piece_type_bitboard = if piece_type.is_king() {
+            self.get_king_bitboard()
+        } else {
+            !self.get_king_bitboard()
+        };
+        player_bitboard & piece_type_bitboard
+    }
+
+    fn get_piece_counter(&self, piece: Piece) -> u32 {
+        let bitboard = self.get_bitboard(piece);
+        bitboard.count_ones()
+    }
+
+    fn get_player(&self) -> Player {
+        self.current_player
+    }
+
+    fn switch_player(&mut self) {
+        self.current_player = self.get_player().other();
+    }
+
+    fn set(&mut self, x: i8, y: i8, piece_opt: Option<Piece>) {
+        let is_white = if let Some(piece) = piece_opt {
+            piece.is_white()
+        } else {
+            false
+        };
+        let is_black = if let Some(piece) = piece_opt {
+            piece.is_black()
+        } else {
+            false
+        };
+        let is_king = if let Some(piece) = piece_opt {
+            piece.is_king()
+        } else {
+            false
+        };
+        self.get_mut_white_bitboard().set(x, y, is_white);
+        self.get_mut_black_bitboard().set(x, y, is_black);
+        self.get_mut_king_bitboard().set(x, y, is_king);
+    }
+
+    fn promote_if_necessary(&mut self, x: i8, y: i8) {
+        if y == BOARD_SIZE - 1 && self.get(x, y).unwrap() == Piece::from(White, Man) {
             self.set(x, y, Some(Piece::from(White, King)));
             self.reset_board_count();
             self.reset_moves_without_capture();
-        } else if y == 0 && self.get(x, y).unwrap() == (Piece::from(Black, Man)) {
+        } else if y == 0 && self.get(x, y).unwrap() == Piece::from(Black, Man) {
             self.set(x, y, Some(Piece::from(Black, King)));
             self.reset_board_count();
             self.reset_moves_without_capture();
         }
-        self.switch_player();
-
-        self.incr_board_count();
     }
 
-    pub fn display(&self) {
-        println!("\n{:?} is playing", self.get_player());
-        println!(
-            "Moves without capture nor promotion: {}/{}",
+    fn incr_board_count(&mut self) {
+        self.board_count
+            .entry(self.hash())
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+    }
+
+    fn reset_board_count(&mut self) {
+        self.board_count.clear();
+    }
+
+    fn incr_moves_without_capture(&mut self) {
+        self.moves_without_capture += 1;
+    }
+
+    fn reset_moves_without_capture(&mut self) {
+        self.moves_without_capture = 0;
+    }
+
+    fn is_draw(&self) -> bool {
+        self.get_board_count() == MAX_BOARD_COUNT
+            || self.get_moves_without_capture() == MAX_MOVES_WITHOUT_CAPTURE
+    }
+
+    fn output_game_status(&self) {
+        let win_status = self.get_win_status();
+        if win_status.is_end_game() {
+            println!("Game Over!");
+        }
+        if let Win(player) = win_status {
+            println!("> {player:?} won!");
+        } else if win_status == Draw {
+            println!("> Draw");
+        }
+        if win_status.is_end_game() {
+            exit(0);
+        }
+    }
+
+    fn can_move(&self) -> bool {
+        let man_directions = if self.get_player_is_white() {
+            DIRECTIONS_MAN_WHITE
+        } else {
+            DIRECTIONS_MAN_BLACK
+        };
+        let current_player = self.get_player();
+        let player_bitboard = self.get_player_bitboard(current_player);
+        let empty_bitboard = self.get_empty_bitboard();
+        for &direction in man_directions {
+            if (player_bitboard.move_direction(direction) & empty_bitboard) != 0 {
+                return true;
+            }
+        }
+        let player_king_bitboard = player_bitboard & self.get_king_bitboard();
+        for &direction in DIRECTIONS_KING {
+            if (player_king_bitboard.move_direction(direction) & empty_bitboard) != 0 {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn can_jump(&self) -> bool {
+        let man_directions = if self.get_player_is_white() {
+            DIRECTIONS_MAN_WHITE
+        } else {
+            DIRECTIONS_MAN_BLACK
+        };
+        let current_player = self.get_player();
+        let player_bitboard = self.get_player_bitboard(current_player);
+        let opponent_bitboard = self.get_player_bitboard(current_player.other());
+        let empty_bitboard = self.get_empty_bitboard();
+        for &direction in man_directions {
+            if (player_bitboard
+                .move_direction(direction)
+                .move_direction(direction)
+                & opponent_bitboard.move_direction(direction)
+                & empty_bitboard)
+                != 0
+            {
+                return true;
+            }
+        }
+        let player_king_bitboard = player_bitboard & self.get_king_bitboard();
+        for &direction in DIRECTIONS_KING {
+            if (player_king_bitboard
+                .move_direction(direction)
+                .move_direction(direction)
+                & opponent_bitboard.move_direction(direction)
+                & empty_bitboard)
+                != 0
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn add_default_pieces_configuration(&mut self) {
+        for y in 0..NB_PLAYERS_LINES {
+            for x in 0..BOARD_SIZE {
+                if is_playable(x, y) {
+                    self.set(x, y, Some(Piece::from(White, Man)));
+                }
+            }
+        }
+        for y in (BOARD_SIZE - NB_PLAYERS_LINES)..BOARD_SIZE {
+            for x in 0..BOARD_SIZE {
+                if is_playable(x, y) {
+                    self.set(x, y, Some(Piece::from(Black, Man)));
+                }
+            }
+        }
+    }
+}
+
+impl Display for Board {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "{:?} is playing", self.get_player())?;
+        writeln!(
+            f,
+            "Moves without capture or promotion: {}/{}",
             self.get_moves_without_capture(),
             MAX_MOVES_WITHOUT_CAPTURE
-        );
-        println!(
+        )?;
+        writeln!(
+            f,
             "Board count: {}/{}",
             self.get_board_count(),
             MAX_BOARD_COUNT
-        );
-        println!(
+        )?;
+        writeln!(
+            f,
             "White: {} men, {} kings",
             self.get_piece_counter(Piece::from(White, Man)),
             self.get_piece_counter(Piece::from(White, King)),
-        );
-        println!(
+        )?;
+        writeln!(
+            f,
             "Black: {} men, {} kings",
             self.get_piece_counter(Piece::from(Black, Man)),
             self.get_piece_counter(Piece::from(Black, King)),
-        );
-        println!();
-        print!("   ");
+        )?;
+        writeln!(f)?;
+        write!(f, "   ")?;
         for x in 0..BOARD_SIZE {
-            print!(" {} ", char_of_x(x));
+            write!(f, " {} ", char_of_x(x))?;
         }
-        println!();
+        writeln!(f)?;
         for y in (0..BOARD_SIZE).rev() {
-            print!(" {} ", char_of_y(y));
+            write!(f, " {} ", char_of_y(y))?;
             for x in 0..BOARD_SIZE {
                 if is_playable(x, y) {
                     match self.get(x, y) {
-                        Some(piece) => print!(" {} ", piece.emoji()),
-                        None => print!(" • "),
+                        Some(piece) => write!(f, " {} ", piece.emoji()),
+                        None => write!(f, " • "),
                     }
                 } else {
-                    print!("   ");
-                }
+                    write!(f, "   ")
+                }?;
             }
-            print!(" {} ", char_of_y(y));
-            println!();
+            write!(f, " {} ", char_of_y(y))?;
+            writeln!(f)?;
         }
-        print!("   ");
+        write!(f, "   ")?;
         for x in 0..BOARD_SIZE {
-            print!(" {} ", char_of_x(x));
+            write!(f, " {} ", char_of_x(x))?;
         }
-        println!("\n");
+        writeln!(f)?;
+        Ok(())
     }
 }
 
@@ -477,26 +453,76 @@ pub fn is_playable(x: i8, y: i8) -> bool {
     (0..BOARD_SIZE).contains(&x) && (0..BOARD_SIZE).contains(&y) && (x + y) % 2 == 0
 }
 
-fn get_man_direction(player: Player) -> &'static [(i8, i8)] {
-    if player.is_white() {
-        DIRECTION_MAN_WHITE
-    } else {
-        DIRECTION_MAN_BLACK
+pub fn char_of_x(x: i8) -> char {
+    (x as u8 + b'A') as char
+}
+
+pub fn char_of_y(y: i8) -> char {
+    (y as u8 + b'1') as char
+}
+
+fn add_moves_moving(board: &Board, moves: &mut Vec<Move>, directions: &[(i8, i8)], x: i8, y: i8) {
+    for &(dx, dy) in directions {
+        let (x2, y2) = (x + dx, y + dy);
+        if is_playable(x2, y2) && board.get_any_bitboard().is_none(x2, y2) {
+            moves.push(vec![(x, y), (x2, y2)]);
+        }
     }
+}
+
+fn add_moves_jumping(
+    board: &mut Board,
+    moves: &mut Vec<Move>,
+    directions: &[(i8, i8)],
+    x: i8,
+    y: i8,
+) -> Vec<usize> {
+    let mut moves_indexes = Vec::new();
+    for &(dx, dy) in directions {
+        let (x2, y2) = (x + dx, y + dy);
+        let (x3, y3) = (x2 + dx, y2 + dy);
+        if is_playable(x3, y3)
+            && board.get_any_bitboard().is_none(x3, y3)
+            && board
+                .get_player_bitboard(board.get_player().other())
+                .is_some(x2, y2)
+        {
+            let jumping_piece = board.get(x, y);
+            let taken_piece = board.get(x2, y2);
+            board.set(x, y, None);
+            board.set(x2, y2, None);
+            board.set(x3, y3, jumping_piece);
+            let mut further_moves_indexes = add_moves_jumping(board, moves, directions, x3, y3);
+            if further_moves_indexes.is_empty() {
+                moves.push(vec![(x3, y3)]);
+                further_moves_indexes.push(moves.len() - 1);
+            }
+            for &move_index in &further_moves_indexes {
+                moves[move_index].insert(0, (x, y));
+            }
+
+            board.set(x, y, jumping_piece);
+            board.set(x2, y2, taken_piece);
+            board.set(x3, y3, None);
+
+            moves_indexes.extend(further_moves_indexes);
+        }
+    }
+    moves_indexes
 }
 
 fn get_directions(piece: Piece) -> &'static [(i8, i8)] {
     if piece.is_king() {
-        DIRECTION_KING
+        DIRECTIONS_KING
     } else {
-        get_man_direction(piece.get_player())
+        get_man_directions(piece.get_player())
     }
 }
 
-pub fn char_of_x(x: i8) -> char {
-    (x as u8 + 'A' as u8) as char
-}
-
-pub fn char_of_y(y: i8) -> char {
-    (y as u8 + '1' as u8) as char
+fn get_man_directions(player: Player) -> &'static [(i8, i8)] {
+    if player.is_white() {
+        DIRECTIONS_MAN_WHITE
+    } else {
+        DIRECTIONS_MAN_BLACK
+    }
 }

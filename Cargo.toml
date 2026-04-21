@@ -1,5 +1,5 @@
 bin = [
-    { name = "Checkers", path = "src/main.rs" }
+    { name = "main", path = "src/main.rs" }
 ]
 
 [package]
@@ -7,22 +7,42 @@ name = "Checkers"
 edition = "2024"
 
 [dependencies]
-rand = "0.9.2"
-ndarray = { version = "0.17.1", optional = true }
+ndarray = "0.17.2"
 blas-src = { version = "0.14.0", features = ["openblas"], optional = true }
-openblas-src = { version = "0.10.13", features = ["cblas", "system"], optional = true }
+openblas-src = { version = "0.10.15", features = ["cblas", "system"], optional = true }
+
+rand = "0.10.1"
+plotpy = "1.21.0"
+chrono = "0.4.44"
 
 [build-dependencies]
-cc = "1.2.51"
+cc = "1.2.60"
+cfg_aliases = "0.2.1"
 
 [features]
-base = ["ndarray"]
-openblas = ["base", "ndarray/blas", "blas-src/openblas", "openblas-src/cblas", "openblas-src/system"]
+# If several implementations are chosen, the overriding one is the lowest on the list:
+openblas = ["ndarray/blas", "blas-src/openblas", "openblas-src/cblas", "openblas-src/system"]
 cublas = []
+# Use f64 precision in neural networks
+f64_precision = []
+
+[profile.release]
+overflow-checks = true
+# For profiling:
+debug = true
+split-debuginfo = "off"
 
 [lints.clippy]
-pedantic = "warn"
-
-# For profiling
-[profile.release]
-debug = "full"
+pedantic = { level = "warn", priority = -1 }
+arc_with_non_send_sync = "allow"
+cast_lossless = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+same_length_and_capacity = "allow"
+uninlined_format_args = "allow"
+unnecessary_cast = "allow"
+wrong_self_convention = "allow"

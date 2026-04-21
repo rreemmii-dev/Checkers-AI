@@ -1,36 +1,6 @@
-#[cfg(feature = "openblas")]
+#[cfg(openblas)]
 extern crate blas_src;
 
-mod players {
-    pub mod alpha_beta {
-        pub mod alpha_beta;
-        pub mod get_move;
-        mod score;
-    }
-    pub mod human {
-        pub mod get_move;
-    }
-    pub mod neural_network {
-        pub mod get_move;
-        pub mod neural_networks_types {
-            pub mod matrix;
-            pub mod neural_network;
-            #[cfg(feature = "base")]
-            pub mod neural_network_base;
-            #[cfg(feature = "cublas")]
-            pub mod neural_network_cublas;
-            #[cfg(feature = "openblas")]
-            pub mod neural_network_openblas;
-            #[cfg(feature = "cublas")]
-            pub mod cuda {
-                pub mod cuda;
-                pub mod handle_pointer;
-                pub mod matrix_pointer;
-            }
-        }
-        pub mod training;
-    }
-}
 mod checkers {
     pub mod bitboard;
     pub mod board;
@@ -39,39 +9,88 @@ mod checkers {
     pub mod player;
     pub mod win_status;
 }
-mod utils;
+pub mod neural_network {
+    pub mod training {
+        pub mod graphs;
+        pub mod heuristic_comparison;
+        pub mod tournament;
+        pub mod train;
+    }
+    pub mod types {
+        #[cfg(cublas)]
+        pub mod cuda {
+            pub mod context_pointer;
+            pub mod cuda;
+            pub mod matrix_pointer;
+        }
+        pub mod matrix;
+        pub mod neural_network_base;
+        #[cfg(cublas)]
+        pub mod neural_network_cublas;
+        #[cfg(openblas)]
+        pub mod neural_network_openblas;
+    }
+    pub mod neural_network;
+    pub mod storage;
+}
+mod players {
+    pub mod alpha_beta {
+        pub mod get_move;
+        pub mod score;
+    }
+    pub mod human {
+        pub mod get_move;
+    }
+    pub mod neural_network {
+        pub mod get_move;
+    }
+    pub mod utils {
+        pub mod alpha_beta;
+    }
+}
+mod consts;
 
-#[cfg(all(feature = "base", not(feature = "openblas")))]
-pub type NeuralNetwork =
-    players::neural_network::neural_networks_types::neural_network_base::NeuralNetworkBase;
-#[cfg(feature = "openblas")]
-pub type NeuralNetwork =
-    players::neural_network::neural_networks_types::neural_network_openblas::NeuralNetworkOpenblas;
-#[cfg(feature = "cublas")]
-pub type NeuralNetwork =
-    players::neural_network::neural_networks_types::neural_network_cublas::NeuralNetworkCuda;
-
-use crate::players::neural_network::training::train_loop;
+use std::thread::sleep;
 use std::time::Duration;
-
-// TODO: Solve simple positions (eg: <= 3-4 pieces per player)?
-//  Implement Monte Carlo tree search?
-
-const PLAY_AS_WHITE: bool = true;
-const PLAY_AS_BLACK: bool = !PLAY_AS_WHITE;
-const AI_TIME_PER_MOVE: Duration = Duration::from_secs(1);
-const MAX_DEPTH_TRAINING: i8 = 2 * 1;
-const MAX_THREADS_DEPTH: i8 = 2; // recommended: 1 or 2 (branch-size usually between 5 and 10)
-const BEST_MOVE_FIRST_MIN_DEPTH: i8 = 2 * 4; // use "best move first" strategy if depth >= BEST_MOVE_FIRST_MIN_DEPTH
-const BEST_MOVE_FIRST_SKIP_SIZE: i8 = 2 * 3; // choose the best move by exploring at depth := depth - BEST_MOVE_FIRST_SKIP_SIZE
-
-//const NODES_PER_LAYER: [usize; 6] = [130, 512, 1024, 512, 256, 1];
-const NODES_PER_LAYER: [usize; 8] = [130, 512, 1024, 1024, 512, 256, 128, 1];
-const NB_LAYERS: usize = NODES_PER_LAYER.len();
-const LEARNING_RATE_EVOLUTIONS: &[f64] = &[0.5, 0.623, 0.794, 1., 1.260, 1.587, 2.]; // Rounded logscale of 0.5..2.
-const NB_LEARNING_RATES: usize = LEARNING_RATE_EVOLUTIONS.len();
-const NB_LEARNINGS_PER_RESULT: usize = 10;
+use crate::checkers::board::Board;
+use crate::checkers::player::Player::{Black, White};
+use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
+use crate::consts::Mode::{Play, Tournament, Train};
+use crate::consts::{AI_TIME_LIMIT_STRATEGY, get_mode};
+use crate::neural_network::storage::load_neural_network;
+use crate::neural_network::training::tournament::run_tournament;
+use crate::neural_network::training::train::train_loop;
+use crate::players::human::get_move::get_human_move;
+use crate::players::neural_network::get_move::get_neural_network_move;
 
 fn main() {
-    train_loop("neural_networks");
+    match get_mode() {
+        Play => play(),
+        Train => train_loop("neural_networks"),
+        Tournament => run_tournament("neural_networks"),
+    }
+}
+
+fn play() {
+    let neural_network = load_neural_network("neural_network.txt");
+    loop {
+        let mut board = Board::new();
+        while !board.is_end_game() {
+            println!("{}", board);
+            let m = if board.get_player_is_white() {
+                get_human_move(&board)
+            } else {
+                get_neural_network_move(&board, &neural_network, AI_TIME_LIMIT_STRATEGY, true)
+            };
+            board.play(&m);
+        }
+        println!("{}", board);
+        match board.get_win_status() {
+            Win(White) => println!("> You won!"),
+            Win(Black) => println!("> You lost (the game)!"),
+            Draw => println!("> Draw!"),
+            Continue => panic!("Continue"),
+        }
+        sleep(Duration::from_secs(5));
+    }
 }

@@ -9,25 +9,6 @@ pub struct Piece {
     piece_type: PieceType,
 }
 
-pub const PIECES: &[Piece] = &[
-    Piece {
-        player: White,
-        piece_type: Man,
-    },
-    Piece {
-        player: White,
-        piece_type: King,
-    },
-    Piece {
-        player: Black,
-        piece_type: Man,
-    },
-    Piece {
-        player: Black,
-        piece_type: King,
-    },
-];
-
 impl Piece {
     pub fn get_player(self) -> Player {
         self.player

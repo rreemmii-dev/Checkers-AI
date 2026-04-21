@@ -1,17 +1,47 @@
 use crate::checkers::board::{
-    BOARD_SIZE, Board, MAX_BOARD_COUNT, MAX_MOVES_WITHOUT_CAPTURE, is_playable,
+    BOARD_SIZE, Board, MAX_BOARD_COUNT, MAX_MOVES_WITHOUT_CAPTURE, Move, is_playable,
 };
-use crate::players::alpha_beta::alpha_beta::threaded_moves_list;
-use crate::players::neural_network::neural_networks_types::matrix::Matrix;
-use crate::players::neural_network::neural_networks_types::neural_network::NeuralNetworkTrait;
-use crate::{
-    AI_TIME_PER_MOVE, BEST_MOVE_FIRST_MIN_DEPTH, BEST_MOVE_FIRST_SKIP_SIZE, MAX_DEPTH_TRAINING,
-    MAX_THREADS_DEPTH, NeuralNetwork,
+use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
+use crate::consts::{NeuralNetwork, NeuralNetworkFloat};
+use crate::neural_network::neural_network::NeuralNetworkTrait;
+use crate::neural_network::types::matrix::Matrix;
+use crate::players::alpha_beta::get_move::{
+    get_alpha_beta_move_depth_limit, get_alpha_beta_move_time_limit,
 };
+use ChooseMoveStrategy::{DepthLimit, TimeLimit, Training};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::thread::sleep;
+use std::time::Duration;
+
+#[derive(Clone, Copy)]
+pub enum ChooseMoveStrategy {
+    DepthLimit(i8),
+    TimeLimit(Duration),
+    Training,
+}
+
+pub fn get_neural_network_move(
+    board: &Board,
+    neural_network: &NeuralNetwork,
+    move_strategy: ChooseMoveStrategy,
+    threaded: bool,
+) -> Move {
+    let neural_network_clone = neural_network.clone();
+    let heuristic = Arc::new(move |board: &Board| {
+        // Current player POV
+        let f64_score = neural_network_clone.get_output(input_of_board(board));
+        ((f64_score - 0.5) * 1_000_000.) as i64
+    });
+    match move_strategy {
+        DepthLimit(depth_limit) => {
+            get_alpha_beta_move_depth_limit(board, heuristic, depth_limit, threaded)
+        }
+        TimeLimit(duration) => get_alpha_beta_move_time_limit(board, heuristic, duration, threaded),
+        Training => {
+            assert!(!threaded);
+            get_neural_network_move_training(board, neural_network)
+        }
+    }
+}
 
 pub fn input_of_board(board: &Board) -> Matrix {
     let mut res = Matrix::zero(130, 1);
@@ -37,141 +67,76 @@ pub fn input_of_board(board: &Board) -> Matrix {
     res.set(
         128,
         0,
-        board.get_board_count() as f64 / MAX_BOARD_COUNT as f64,
+        board.get_board_count() as NeuralNetworkFloat / MAX_BOARD_COUNT as NeuralNetworkFloat,
     );
     res.set(
         129,
         0,
-        board.get_moves_without_capture() as f64 / MAX_MOVES_WITHOUT_CAPTURE as f64,
+        board.get_moves_without_capture() as NeuralNetworkFloat
+            / MAX_MOVES_WITHOUT_CAPTURE as NeuralNetworkFloat,
     );
     res
 }
 
-fn get_neural_network_move_old(
-    board: &Board,
-    neural_network: &NeuralNetwork,
-    is_training: bool,
-) -> Vec<(i8, i8)> {
-    // TODO: Really better than the regular one?
-    let arc_nn = Arc::new(neural_network.to_owned());
-
-    if board.is_end_game() {
-        return Vec::new();
-    }
-
-    let best_moves = if is_training {
-        let heuristic_nn = move |board: &Board| {
-            // Current player POV
-            let f64_score = arc_nn.get_output(input_of_board(board));
-            ((f64_score - 0.5) * 1_000_000.) as i64
-        };
-        // alpha_beta_list(
-        //     &board,
-        //     &heuristic_nn,
-        //     BEST_MOVE_FIRST_MIN_DEPTH,
-        //     BEST_MOVE_FIRST_SKIP_SIZE,
-        //     MAX_DEPTH_TRAINING,
-        //     &AtomicBool::new(false),
-        // )
-        threaded_moves_list(
-            board.clone(),
-            Arc::new(heuristic_nn),
-            BEST_MOVE_FIRST_MIN_DEPTH,
-            BEST_MOVE_FIRST_SKIP_SIZE,
-            MAX_DEPTH_TRAINING,
-            MAX_THREADS_DEPTH,
-            Arc::new(AtomicBool::new(false)),
-        )
-        .unwrap()
-    } else {
-        let mut best_moves = Vec::new();
-        let mut depth = 2 * 1;
-        let cancel_search = Arc::new(AtomicBool::new(false));
-        {
-            let cancel_search = cancel_search.clone();
-            thread::spawn(move || {
-                sleep(AI_TIME_PER_MOVE);
-                cancel_search.store(true, Ordering::Release);
-            });
-        }
-        while !cancel_search.load(Ordering::Acquire) {
-            let arc_nn = arc_nn.clone();
-            let heuristic_nn = move |board: &Board| {
-                // Current player POV
-                let f64_score = arc_nn.get_output(input_of_board(board));
-                ((f64_score - 0.5) * 1_000_000.) as i64
-            };
-
-            if let Some(new_best_moves) = threaded_moves_list(
-                board.clone(),
-                Arc::new(heuristic_nn),
-                BEST_MOVE_FIRST_MIN_DEPTH,
-                BEST_MOVE_FIRST_SKIP_SIZE,
-                depth,
-                MAX_THREADS_DEPTH,
-                cancel_search.clone(),
-            ) {
-                // if let Some(new_best_moves) = alpha_beta_list(
-                //     &board,
-                //     &heuristic_nn,
-                //     BEST_MOVE_FIRST_MIN_DEPTH,
-                //     BEST_MOVE_FIRST_SKIP_SIZE,
-                //     depth,
-                //     &cancel_search,
-                // ) {
-                best_moves = new_best_moves;
-                depth += 2;
-                if depth >= 2 * 50 {
-                    // Probably end of game, or only 1 move allowed
-                    break;
-                }
-            }
-        }
-        best_moves
-    };
-
-    let x = rand::random_range(0..best_moves.len());
-    best_moves[x].clone()
-}
-
-pub fn get_neural_network_move(
-    board: &Board,
-    neural_network: &NeuralNetwork,
-    is_training: bool,
-) -> Vec<(i8, i8)> {
-    if !is_training {
-        return get_neural_network_move_old(board, neural_network, is_training);
-    }
+fn get_neural_network_move_training(board: &Board, neural_network: &NeuralNetwork) -> Move {
     let mut moves = Vec::new();
     let mut inputs = Vec::new();
+    let mut fixed_scores = Vec::new();
+    let self_is_white = board.get_player_is_white();
     for m in board.possible_moves() {
         let mut board = board.clone();
         board.play(&m);
-        let input = input_of_board(&board);
         moves.push(m);
-        inputs.push(input);
+        inputs.push(input_of_board(&board));
+        fixed_scores.push(match board.get_win_status() {
+            Win(player) => {
+                // Not 1. or 0.: needs to be unsigmoid-safe
+                if player.is_white() == self_is_white {
+                    Some(0.999)
+                } else {
+                    Some(0.001)
+                }
+            }
+            Draw => Some(0.5),
+            Continue => None,
+        });
     }
-    let mut output = neural_network
+    let mut scores = neural_network
         .get_outputs(inputs)
         .into_iter()
-        .map(|res| -res)
+        .map(|opponent_score| 1. - opponent_score)
         .collect::<Vec<_>>();
-    // TODO: Cf how to choose the best move according to scores?
-    let sum = output.iter().map(|x| x.abs()).sum::<f64>();
-    output.iter_mut().for_each(|v| *v /= sum);
-    output.iter_mut().for_each(|v| *v = v.exp());
-    let sum = output.iter().sum::<f64>();
-    output.iter_mut().for_each(|v| *v /= sum);
-    assert!((output.iter().sum::<f64>() - 1.).abs() < 1e-10);
-    let val = rand::random::<f64>();
+    for (index, score_opt) in fixed_scores.into_iter().enumerate() {
+        if let Some(score) = score_opt {
+            scores[index] = score;
+        }
+    }
+
+    choose_move_from_scores(scores, moves)
+}
+
+fn choose_move_from_scores(scores: Vec<NeuralNetworkFloat>, moves: Vec<Move>) -> Move {
+    let mut scores = scores;
+    for v in &mut scores {
+        *v = NeuralNetworkFloat::exp(unsigmoid(*v));
+    }
+    let sum = scores.iter().sum::<NeuralNetworkFloat>();
+    for v in &mut scores {
+        *v /= sum;
+    }
+    let new_sum = scores.iter().sum::<NeuralNetworkFloat>();
+    assert!((new_sum - 1.).abs() < 1e-5, "{}: {:?}", new_sum, scores);
+    let val = rand::random::<NeuralNetworkFloat>();
     let mut current_sum = 0.;
     for (move_id, m) in moves.into_iter().enumerate() {
-        let v = output[move_id];
-        current_sum += v;
+        current_sum += scores[move_id];
         if current_sum > val {
             return m;
         }
     }
-    println!("{}", current_sum);
-    panic!();
+    panic!("{} (target) > {} (sum of probabilities)", val, current_sum);
+}
+
+fn unsigmoid(y: NeuralNetworkFloat) -> NeuralNetworkFloat {
+    NeuralNetworkFloat::ln(y / (1. - y))
 }

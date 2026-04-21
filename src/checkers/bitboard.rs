@@ -1,4 +1,4 @@
-// For more information about bitboards, see the subsection #Performance#Bitboards in the README.md
+// For more information about bitboards, see the subsection #Appendix#Bitboards in the README.md
 
 use crate::checkers::board::{BOARD_SIZE, char_of_x, char_of_y, is_playable};
 
@@ -8,14 +8,15 @@ pub trait BitBoard {
     fn set(&mut self, x: i8, y: i8, value: bool);
     fn is_some(self, x: i8, y: i8) -> bool;
     fn is_none(self, x: i8, y: i8) -> bool;
-    fn move_direction(self, dir: &(i8, i8)) -> Self;
+    fn move_direction(self, direction: (i8, i8)) -> Self;
+    #[allow(dead_code)] // Only used for debug
     fn display(self);
 }
 
-const EVEN_ROW_MASK: u32 = 0x0f0f0f0f; // Mask for y = 0, 2, 4, 6
+const EVEN_ROW_MASK: u32 = 0x0f0f_0f0f; // Mask for y = 0, 2, 4, 6
 const ODD_ROW_MASK: u32 = !EVEN_ROW_MASK; // Mask for y = 1, 3, 5, 7
-const LEFT_COLUMN_MASK: u32 = 0x01010101; // Mask for x = 0
-const RIGHT_COLUMN_MASK: u32 = 0x80808080; // Mask for x = 7
+const LEFT_COLUMN_MASK: u32 = 0x0101_0101; // Mask for x = 0
+const RIGHT_COLUMN_MASK: u32 = 0x8080_8080; // Mask for x = 7
 
 impl BitBoard for u32 {
     fn set_bit(&mut self, n: usize, value: bool) {
@@ -45,21 +46,25 @@ impl BitBoard for u32 {
         !self.is_some(x, y)
     }
 
-    fn move_direction(self, direction: &(i8, i8)) -> Self {
-        if direction == &(1, 1) {
-            // North East
-            ((EVEN_ROW_MASK & self) << 4) | ((ODD_ROW_MASK & !RIGHT_COLUMN_MASK & self) << 5)
-        } else if direction == &(-1, 1) {
-            // North West
-            ((EVEN_ROW_MASK & !LEFT_COLUMN_MASK & self) << 3) | ((ODD_ROW_MASK & self) << 4)
-        } else if direction == &(1, -1) {
-            // South East
-            ((EVEN_ROW_MASK & self) >> 4) | ((ODD_ROW_MASK & !RIGHT_COLUMN_MASK & self) >> 3)
-        } else if direction == &(-1, -1) {
-            // South West
-            ((EVEN_ROW_MASK & !LEFT_COLUMN_MASK & self) >> 5) | ((ODD_ROW_MASK & self) >> 4)
-        } else {
-            panic!()
+    fn move_direction(self, direction: (i8, i8)) -> Self {
+        match direction {
+            (1, 1) => {
+                // North East
+                ((EVEN_ROW_MASK & self) << 4) | ((ODD_ROW_MASK & !RIGHT_COLUMN_MASK & self) << 5)
+            }
+            (-1, 1) => {
+                // North West
+                ((EVEN_ROW_MASK & !LEFT_COLUMN_MASK & self) << 3) | ((ODD_ROW_MASK & self) << 4)
+            }
+            (1, -1) => {
+                // South East
+                ((EVEN_ROW_MASK & self) >> 4) | ((ODD_ROW_MASK & !RIGHT_COLUMN_MASK & self) >> 3)
+            }
+            (-1, -1) => {
+                // South West
+                ((EVEN_ROW_MASK & !LEFT_COLUMN_MASK & self) >> 5) | ((ODD_ROW_MASK & self) >> 4)
+            }
+            _ => panic!("{:?}", direction),
         }
     }
 
