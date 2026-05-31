@@ -17,7 +17,7 @@ pub fn store_new_neural_networks(neural_networks: &[NeuralNetwork], folder: &str
     store_neural_networks(neural_networks, &new_folder_path);
 }
 
-pub fn load_lastest_neural_networks(folder: &str) -> Vec<NeuralNetwork> {
+pub fn load_latest_neural_networks(folder: &str) -> Vec<NeuralNetwork> {
     let folder_id = get_latest_folder_id(folder);
     load_neural_networks(&format!("{folder}/{folder_id}"))
 }

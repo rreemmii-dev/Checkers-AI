@@ -1,5 +1,5 @@
 use crate::checkers::win_status::WinStatus::Continue;
-use crate::consts::{AI_DEPTH_LIMIT_STRATEGY_TOURNAMENT, NeuralNetwork};
+use crate::consts::{DEPTH_LIMIT_STRATEGY, NeuralNetwork};
 use crate::neural_network::storage::load_all_neural_networks;
 use crate::neural_network::training::graphs::display_results;
 use crate::neural_network::training::heuristic_comparison::compare_heuristics;
@@ -36,8 +36,7 @@ fn compute_tournament_result(neural_networks: &[NeuralNetwork]) -> TournamentRes
         let nn1 = nn1.to_owned();
         handle.push(thread::spawn(move || {
             for (index2, nn2) in neural_networks.iter().enumerate() {
-                result.lock().unwrap()[index1][index2] =
-                    play_game(&nn1, nn2, AI_DEPTH_LIMIT_STRATEGY_TOURNAMENT);
+                result.lock().unwrap()[index1][index2] = play_game(&nn1, nn2, DEPTH_LIMIT_STRATEGY);
             }
         }));
     }

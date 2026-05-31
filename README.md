@@ -164,8 +164,8 @@ Each player had a limited amount of time (100ms) to explore as deeply as possibl
 
 |  Neural-network  | Win | Draw | Loss |
 |:----------------:|:---:|:----:|:----:|
-| Playing as white | 2%  | 19%  | 79%  |
-| Playing as black | 1%  | 16%  | 83%  |
+| Playing as white | 19% | 29%  | 52%  |
+| Playing as black | 13% | 26%  | 61%  |
 
 #### Depth-limited
 
@@ -174,13 +174,13 @@ Each player had an unlimited amount of time to explore up to a given depth (4 mo
 |  Neural-network  | Win  | Draw | Loss |
 |:----------------:|:----:|:----:|:----:|
 | Playing as white | 100% |  0%  |  0%  |
-| Playing as black |  1%  | 39%  | 60%  |
+| Playing as black | 15%  | 51%  | 34%  |
 
 #### Conclusion
 
 As of today, the neural-network-based heuristics underperform compared to the human-based heuristic.
 Although the neural-network-based heuristics provide a better board evaluation than the human-based heuristic especially when playing as white (overall win in the depth-limited comparison), every heuristic computation takes more time due to the overhead of the neural network.
-Thus, the human-based heuristic can explore deeper in the same amount of time, leading to its overall win in the time-limited comparison.
+Thus, the human-based heuristic can explore deeper in the same amount of time, leading to its win in the time-limited comparison.
 
 
 ## License

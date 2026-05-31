@@ -9,14 +9,14 @@ edition = "2024"
 [dependencies]
 ndarray = "0.17.2"
 blas-src = { version = "0.14.0", features = ["openblas"], optional = true }
-openblas-src = { version = "0.10.15", features = ["cblas", "system"], optional = true }
+openblas-src = { version = "0.10.16", features = ["cblas", "system"], optional = true }
 
 rand = "0.10.1"
-plotpy = "1.21.0"
+plotpy = "1.22.0"
 chrono = "0.4.44"
 
 [build-dependencies]
-cc = "1.2.60"
+cc = "1.2.63"
 cfg_aliases = "0.2.1"
 
 [features]

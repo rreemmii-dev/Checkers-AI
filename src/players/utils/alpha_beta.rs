@@ -10,7 +10,7 @@ use std::thread;
 
 // heuristic_score: Current player point of view
 
-const MAX_THREADING_DEPTH: i8 = 2; // recommended: 1 or 2 (branch-size usually between 5 and 10)
+const MAX_THREADING_DEPTH: i8 = 1; // recommended: 1 or 2 (branch-size usually between 5 and 10)
 const BEST_MOVE_FIRST_MIN_DEPTH: i8 = 2 * 4; // use "best move first" strategy if depth >= BEST_MOVE_FIRST_MIN_DEPTH
 const BEST_MOVE_FIRST_SKIP_SIZE: i8 = 2 * 3; // choose the best move by exploring at depth := depth - BEST_MOVE_FIRST_SKIP_SIZE
 
@@ -71,7 +71,6 @@ fn alpha_beta_score(
 
     // ********** Main: get score value **********
     let moves = best_move_first(board, heuristic_score, cache, depth, cancel_search);
-    let mut score = alpha;
     for m in moves {
         let mut cloned_board = board.clone();
         cloned_board.play(&m);
@@ -87,17 +86,18 @@ fn alpha_beta_score(
 
         // ********** Alpha-beta pruning **********
         if res >= beta {
-            score = beta;
+            alpha = beta;
             break;
+        } else if res > alpha {
+            alpha = res;
         }
-        alpha = i64::max(alpha, res);
-        score = alpha;
     }
 
     if cancel_search.load(Ordering::Acquire) {
         return 0;
     }
 
+    let score = alpha;
     // ********** Store results **********
     cache.insert((board.hash(), depth), {
         let (stored_min, stored_max) = cache
@@ -139,7 +139,7 @@ fn alpha_beta_best_moves(
     for m in moves {
         let mut cloned_board = board.clone();
         cloned_board.play(&m);
-        let alpha = best_score;
+        let alpha = i64::max(best_score - 1, NEG_INFINITY);
         let beta = POS_INFINITY;
         let res = -alpha_beta_score(
             &cloned_board,

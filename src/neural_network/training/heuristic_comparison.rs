@@ -1,8 +1,7 @@
 use crate::checkers::board::Board;
 use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
 use crate::consts::{
-    AI_ALPHA_BETA_DEPTH_TOURNAMENT, AI_DEPTH_LIMIT_STRATEGY_TOURNAMENT, AI_TIME_LIMIT_STRATEGY,
-    AI_TIME_PER_MOVE, NeuralNetwork,
+    DEPTH_LIMIT, DEPTH_LIMIT_STRATEGY, NeuralNetwork, TIME_LIMIT_STRATEGY, TIME_PER_MOVE,
 };
 use crate::players::alpha_beta::get_move::{
     get_alpha_beta_move_depth_limit, get_alpha_beta_move_simple_heuristic_time_limit,
@@ -62,25 +61,15 @@ fn play(
     while !board.is_end_game() {
         let m = if nn_plays {
             if is_time_limited {
-                get_neural_network_move(&board, neural_network, AI_TIME_LIMIT_STRATEGY, true)
+                get_neural_network_move(&board, neural_network, TIME_LIMIT_STRATEGY, true)
             } else {
-                get_neural_network_move(
-                    &board,
-                    neural_network,
-                    AI_DEPTH_LIMIT_STRATEGY_TOURNAMENT,
-                    true,
-                )
+                get_neural_network_move(&board, neural_network, DEPTH_LIMIT_STRATEGY, true)
             }
         } else {
             if is_time_limited {
-                get_alpha_beta_move_simple_heuristic_time_limit(&board, AI_TIME_PER_MOVE, true)
+                get_alpha_beta_move_simple_heuristic_time_limit(&board, TIME_PER_MOVE, true)
             } else {
-                get_alpha_beta_move_depth_limit(
-                    &board,
-                    Arc::new(naive_score),
-                    AI_ALPHA_BETA_DEPTH_TOURNAMENT,
-                    true,
-                )
+                get_alpha_beta_move_depth_limit(&board, Arc::new(naive_score), DEPTH_LIMIT, true)
             }
         };
         board.play(&m);

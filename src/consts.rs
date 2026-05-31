@@ -12,19 +12,13 @@ pub enum Mode {
 }
 
 /// Default time spent by the AI to choose its next move
-pub const AI_TIME_PER_MOVE: Duration = Duration::from_secs(1);
+pub const TIME_PER_MOVE: Duration = Duration::from_secs(1);
 /// Choose move strategy using time limit
-pub const AI_TIME_LIMIT_STRATEGY: ChooseMoveStrategy = TimeLimit(AI_TIME_PER_MOVE);
-/// Default alpha beta exploration depth to choose the AI next move for `tournament`
-pub const AI_ALPHA_BETA_DEPTH_TOURNAMENT: i8 = 4;
-/// Choose move strategy using depth limit for `tournament`
-pub const AI_DEPTH_LIMIT_STRATEGY_TOURNAMENT: ChooseMoveStrategy =
-    DepthLimit(AI_ALPHA_BETA_DEPTH_TOURNAMENT);
-/// Default alpha beta exploration depth to choose the AI next move for `keep_best_learning_rate`
-const AI_ALPHA_BETA_DEPTH_KEEP_BEST_LEARNING_RATE: i8 = 2;
-/// Choose move strategy using depth limit for `keep_best_learning_rate`
-pub const AI_DEPTH_LIMIT_STRATEGY_KEEP_BEST_LEARNING_RATE: ChooseMoveStrategy =
-    DepthLimit(AI_ALPHA_BETA_DEPTH_KEEP_BEST_LEARNING_RATE);
+pub const TIME_LIMIT_STRATEGY: ChooseMoveStrategy = TimeLimit(TIME_PER_MOVE);
+/// Default alpha beta exploration depth to choose the AI next move
+pub const DEPTH_LIMIT: i8 = 4;
+/// Choose move strategy using depth limit
+pub const DEPTH_LIMIT_STRATEGY: ChooseMoveStrategy = DepthLimit(DEPTH_LIMIT);
 
 /// The default number of parameters in each layer of the neural network, for newly created neural networks only
 // pub const DEFAULT_NODES_PER_LAYER: [usize; 4] = [130, 512, 256, 1];

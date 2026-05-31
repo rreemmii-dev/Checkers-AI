@@ -2,12 +2,11 @@ use crate::checkers::board::Board;
 use crate::checkers::win_status::WinStatus;
 use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
 use crate::consts::{
-    AI_DEPTH_LIMIT_STRATEGY_KEEP_BEST_LEARNING_RATE, AI_TIME_LIMIT_STRATEGY, AI_TIME_PER_MOVE,
-    LEARNING_RATE_EVOLUTIONS, NB_LEARNING_RATES, NB_LEARNINGS_PER_RESULT, NB_NEURAL_NETWORKS,
-    NeuralNetwork, NeuralNetworkFloat,
+    DEPTH_LIMIT_STRATEGY, LEARNING_RATE_EVOLUTIONS, NB_LEARNING_RATES, NB_LEARNINGS_PER_RESULT,
+    NB_NEURAL_NETWORKS, NeuralNetwork, NeuralNetworkFloat, TIME_LIMIT_STRATEGY, TIME_PER_MOVE,
 };
 use crate::neural_network::neural_network::NeuralNetworkTrait;
-use crate::neural_network::storage::{load_lastest_neural_networks, store_new_neural_networks};
+use crate::neural_network::storage::{load_latest_neural_networks, store_new_neural_networks};
 use crate::neural_network::types::matrix::Matrix;
 use crate::players::alpha_beta::get_move::get_alpha_beta_move_simple_heuristic_time_limit;
 use crate::players::neural_network::get_move::ChooseMoveStrategy::Training;
@@ -33,15 +32,20 @@ struct TrainingResult {
 pub fn train_loop(folder: &str) {
     loop {
         let t0 = Instant::now();
-        let training_result = train(folder, Duration::from_secs(60), 15);
+        let training_result = train(folder, Duration::from_mins(5), 8);
+        println!(
+            "Training with: {} games, {} draws",
+            training_result.nb_games, training_result.nb_draws
+        );
+        println!("Spent {:?}", t0.elapsed());
         let nn = training_result.neural_networks[0].clone();
         let mut board = Board::new();
         while !board.is_end_game() {
             println!("{}", board);
             let m = if board.get_player_is_white() {
-                get_neural_network_move(&board, &nn, AI_TIME_LIMIT_STRATEGY, true)
+                get_neural_network_move(&board, &nn, TIME_LIMIT_STRATEGY, true)
             } else {
-                get_alpha_beta_move_simple_heuristic_time_limit(&board, AI_TIME_PER_MOVE, true)
+                get_alpha_beta_move_simple_heuristic_time_limit(&board, TIME_PER_MOVE, true)
             };
             board.play(&m);
         }
@@ -85,7 +89,7 @@ pub fn play_game(
 }
 
 fn train(folder: &str, duration_per_training: Duration, nb_trainings: usize) -> TrainingResult {
-    let mut neural_networks = load_lastest_neural_networks(folder);
+    let mut neural_networks = load_latest_neural_networks(folder);
     let mut nb_games = 0;
     let mut nb_draws = 0;
     for _ in 0..nb_trainings {
@@ -143,7 +147,7 @@ fn keep_best_learning_rate(all_training_results: Vec<TrainingResult>) -> Trainin
                         let game_result = play_game(
                             &all_training_results[white_team_id].neural_networks[white_nn],
                             &all_training_results[black_team_id].neural_networks[black_nn],
-                            AI_DEPTH_LIMIT_STRATEGY_KEEP_BEST_LEARNING_RATE,
+                            DEPTH_LIMIT_STRATEGY,
                         );
                         res.push((white_team_id, black_team_id, game_result));
                     }

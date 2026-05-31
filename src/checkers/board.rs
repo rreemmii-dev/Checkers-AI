@@ -10,7 +10,6 @@ use crate::checkers::win_status::WinStatus::{Continue, Draw, Win};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::process::exit;
-use std::vec;
 
 pub type Move = Vec<(i8, i8)>;
 pub type BoardHash = (bool, u32, u32, u32);
