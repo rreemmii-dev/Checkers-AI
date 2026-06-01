@@ -5,6 +5,14 @@ This is a checkers (or draughts) game with several AI opponent algorithms. It is
 
 Rules: [English draughts](https://wcdf.net/rules.htm)
 
+
+> [!NOTE]
+> You can play against the AI bot by connecting to SSH. Open a terminal and run:
+> ```bash
+> ssh guest@ssh.remi-deloye.me -p 50022
+> ```
+
+
 <div align="center">
 A rather simple UI, running in a terminal:
 <br>
